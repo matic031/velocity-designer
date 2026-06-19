@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { Renderer, Program, Mesh, Triangle } from 'ogl';
+import { mouseFocus } from './mouseFocus';
 
 export interface LightfallProps {
   className?: string;
@@ -306,6 +307,17 @@ const Lightfall: React.FC<LightfallProps> = ({
     const loop = (t: number) => {
       rafRef.current = requestAnimationFrame(loop);
       uniforms.iTime.value = t * 0.001;
+      if (mouseInteraction) {
+        // Drive the mouse glow from the shared, lockable focus point so PNG
+        // exports capture a chosen position. iMouse is in device-pixel buffer
+        // coords with a bottom-left origin.
+        const fx = mouseFocus.x * gl.drawingBufferWidth;
+        const fy = (1 - mouseFocus.y) * gl.drawingBufferHeight;
+        mouseTargetRef.current = [fx, fy];
+        if (mouseDampening <= 0) {
+          uniforms.iMouse.value = [fx, fy];
+        }
+      }
       if (mouseDampening > 0) {
         if (!lastTimeRef.current) lastTimeRef.current = t;
         const dt = (t - lastTimeRef.current) / 1000;

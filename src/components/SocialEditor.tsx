@@ -45,6 +45,7 @@ import {
 } from "lucide-react";
 import { BACKGROUNDS, BACKGROUND_BY_ID, resolveBackgroundColors } from "./backgrounds";
 import { SocialCanvas } from "./SocialCanvas";
+import { mouseFocus } from "./mouseFocus";
 import { TEMPLATES, TEMPLATE_BY_ID } from "./templates";
 import type {
   CanvasState,
@@ -58,6 +59,21 @@ import type {
 import { DEFAULT_GRADIENT_PARAMS, FORMAT_DIMS } from "./types";
 
 const STORAGE_KEY = "velocity.social.editor.v1";
+
+/** Backgrounds whose visible effect depends on cursor POSITION. Only these
+ *  expose the lockable "Mouse focus" control. Motion-driven backgrounds
+ *  (Dot Field, Dot Grid - their effect comes from cursor speed) are excluded
+ *  because a frozen point produces no effect there. */
+const MOUSE_FOCUS_BACKGROUNDS = new Set<string>([
+  "soft-aurora",
+  "iridescence",
+  "threads",
+  "lightrays",
+  "lightfall",
+  "linewaves",
+  "particles",
+  "gradient-blinds",
+]);
 
 type Action =
   | { type: "SET_FORMAT"; format: Format }
@@ -388,6 +404,26 @@ export function SocialEditor(): React.JSX.Element {
     y: false,
   });
 
+  // Mouse-focus control. Mouse-driven backgrounds read a shared focus point
+  // (see mouseFocus.ts) instead of the live cursor, so a still export can
+  // capture the effect at a chosen spot. The user aims it by moving the
+  // cursor over the canvas and freezes it with Space (or the sliders).
+  const bgIsMouse = MOUSE_FOCUS_BACKGROUNDS.has(state.backgroundId);
+  const [focus, setFocus] = useState({ x: 0.5, y: 0.5 });
+  const [focusLocked, setFocusLocked] = useState(false);
+  const applyFocus = useCallback((x: number, y: number) => {
+    const cx = Math.max(0, Math.min(1, x));
+    const cy = Math.max(0, Math.min(1, y));
+    mouseFocus.x = cx;
+    mouseFocus.y = cy;
+    setFocus({ x: cx, y: cy });
+  }, []);
+  // Leaving a mouse-driven background drops the lock so it doesn't linger
+  // when the control panel is hidden.
+  useEffect(() => {
+    if (!bgIsMouse && focusLocked) setFocusLocked(false);
+  }, [bgIsMouse, focusLocked]);
+
   const handleLayerPointerDown = useCallback(
     (id: string, e: React.PointerEvent) => {
       const layer = state.layers.find((l) => l.id === id);
@@ -459,6 +495,15 @@ export function SocialEditor(): React.JSX.Element {
 
   const handleFramePointerMove = useCallback(
     (e: React.PointerEvent) => {
+      // Aim the mouse-focus point: while not dragging a layer, not locked,
+      // and on a mouse-driven background, the cursor over the canvas drives
+      // the shared focus point that the background reads.
+      if (!drag && bgIsMouse && !focusLocked && frameRef.current) {
+        const r = frameRef.current.getBoundingClientRect();
+        if (r.width > 0 && r.height > 0) {
+          applyFocus((e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height);
+        }
+      }
       if (!drag || !frameRef.current) return;
       const rect = frameRef.current.getBoundingClientRect();
       if (rect.width === 0 || rect.height === 0) return;
@@ -524,7 +569,7 @@ export function SocialEditor(): React.JSX.Element {
         update: (l) => ({ ...l, x: nx, y: ny }),
       });
     },
-    [drag, snapAxes],
+    [drag, snapAxes, bgIsMouse, focusLocked, applyFocus],
   );
 
   const handleFramePointerUp = useCallback(() => {
@@ -575,6 +620,25 @@ export function SocialEditor(): React.JSX.Element {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [state.selectedLayerId]);
+
+  // Space toggles the mouse-focus lock (only on mouse-driven backgrounds).
+  // Separate from the layer-nudge handler above so it works with no layer
+  // selected. Ignored while typing in a field.
+  useEffect(() => {
+    function onSpace(e: KeyboardEvent): void {
+      if (e.code !== "Space" && e.key !== " ") return;
+      if (!bgIsMouse) return;
+      const isInput =
+        document.activeElement instanceof HTMLInputElement ||
+        document.activeElement instanceof HTMLTextAreaElement ||
+        document.activeElement instanceof HTMLSelectElement;
+      if (isInput) return;
+      e.preventDefault();
+      setFocusLocked((v) => !v);
+    }
+    window.addEventListener("keydown", onSpace);
+    return () => window.removeEventListener("keydown", onSpace);
+  }, [bgIsMouse]);
 
   // -- Export --------------------------------------------------------------
 
@@ -761,6 +825,25 @@ export function SocialEditor(): React.JSX.Element {
                   dispatch({ type: "SET_BACKGROUND_OPACITY", opacity })
                 }
               />
+              {bgIsMouse ? (
+                <MouseFocusEditor
+                  focus={focus}
+                  locked={focusLocked}
+                  onToggleLock={() => setFocusLocked((v) => !v)}
+                  onChangeX={(v) => {
+                    setFocusLocked(true);
+                    applyFocus(v, focus.y);
+                  }}
+                  onChangeY={(v) => {
+                    setFocusLocked(true);
+                    applyFocus(focus.x, v);
+                  }}
+                  onCenter={() => {
+                    setFocusLocked(true);
+                    applyFocus(0.5, 0.5);
+                  }}
+                />
+              ) : null}
               {state.backgroundId === "custom-gradient" ? (
                 <GradientParamsEditor
                   params={state.gradientParams}
@@ -1276,6 +1359,72 @@ function BackgroundOpacityEditor({
         onChange={(e) => onChange(Number(e.target.value))}
         className="w-full"
       />
+    </div>
+  );
+}
+
+function MouseFocusEditor({
+  focus,
+  locked,
+  onToggleLock,
+  onChangeX,
+  onChangeY,
+  onCenter,
+}: {
+  focus: { x: number; y: number };
+  locked: boolean;
+  onToggleLock: () => void;
+  onChangeX: (v: number) => void;
+  onChangeY: (v: number) => void;
+  onCenter: () => void;
+}): React.JSX.Element {
+  return (
+    <div className="mt-3 rounded-md border border-white/10 bg-white/[0.02] p-2.5">
+      <div className="mb-2 flex items-center justify-between text-[11px] uppercase tracking-wider text-white/40">
+        <span>Mouse focus</span>
+        <button
+          type="button"
+          onClick={onCenter}
+          className="text-[10px] uppercase tracking-wider text-white/40 transition hover:text-white/80"
+          title="Center the focus point"
+        >
+          Center
+        </button>
+      </div>
+      <button
+        type="button"
+        onClick={onToggleLock}
+        className={
+          "mb-1 w-full rounded-md border px-2.5 py-2 text-left text-[11px] font-medium transition " +
+          (locked
+            ? "border-velocity bg-velocity/15 text-white"
+            : "border-white/10 bg-white/[0.03] text-white/70 hover:border-white/25 hover:text-white")
+        }
+      >
+        {locked ? "Locked. Press Space to aim again" : "Aiming. Press Space to lock"}
+      </button>
+      <GradientSlider
+        label="X"
+        value={focus.x}
+        min={0}
+        max={1}
+        step={0.005}
+        display={`${Math.round(focus.x * 100)}%`}
+        onChange={onChangeX}
+      />
+      <GradientSlider
+        label="Y"
+        value={focus.y}
+        min={0}
+        max={1}
+        step={0.005}
+        display={`${Math.round(focus.y * 100)}%`}
+        onChange={onChangeY}
+      />
+      <div className="mt-2 text-[10.5px] leading-relaxed text-white/35">
+        Move your cursor over the canvas to aim the effect, then press Space
+        (or drag the sliders) to lock it in place for export.
+      </div>
     </div>
   );
 }

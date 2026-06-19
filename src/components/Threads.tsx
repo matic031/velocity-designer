@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { Renderer, Program, Mesh, Triangle, Color } from 'ogl';
+import { mouseFocus } from './mouseFocus';
 
 interface ThreadsProps {
   color?: [number, number, number];
@@ -193,6 +194,10 @@ const Threads: React.FC<ThreadsProps> = ({
 
     function update(t: number) {
       if (enableMouseInteraction) {
+        // Follow the shared, lockable focus point instead of the live cursor
+        // so PNG exports capture a chosen position (shader uses a bottom-left
+        // origin, so flip Y).
+        targetMouse = [mouseFocus.x, 1.0 - mouseFocus.y];
         const smoothing = 0.05;
         currentMouse[0] += smoothing * (targetMouse[0] - currentMouse[0]);
         currentMouse[1] += smoothing * (targetMouse[1] - currentMouse[1]);

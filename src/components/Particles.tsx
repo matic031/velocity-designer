@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { Renderer, Camera, Geometry, Program, Mesh } from 'ogl';
+import { mouseFocus } from './mouseFocus';
 
 interface ParticlesProps {
   particleCount?: number;
@@ -206,6 +207,10 @@ const Particles: React.FC<ParticlesProps> = ({
       program.uniforms.uTime.value = elapsed * 0.001;
 
       if (moveParticlesOnHover) {
+        // Follow the shared, lockable focus point so PNG exports capture a
+        // chosen position. Handler convention: centered -1..1 with Y up.
+        mouseRef.current.x = mouseFocus.x * 2 - 1;
+        mouseRef.current.y = -(mouseFocus.y * 2 - 1);
         particles.position.x = -mouseRef.current.x * particleHoverFactor;
         particles.position.y = -mouseRef.current.y * particleHoverFactor;
       } else {

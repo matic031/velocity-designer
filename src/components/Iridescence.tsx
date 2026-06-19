@@ -1,5 +1,6 @@
 import { Renderer, Program, Mesh, Color, Triangle } from 'ogl';
 import { useEffect, useRef } from 'react';
+import { mouseFocus } from './mouseFocus';
 
 const vertexShader = `
 attribute vec2 uv;
@@ -106,6 +107,12 @@ export default function Iridescence({
     function update(t: number) {
       animateId = requestAnimationFrame(update);
       program.uniforms.uTime.value = t * 0.001;
+      if (mouseReact) {
+        // Follow the shared, lockable focus point so PNG exports capture a
+        // chosen position (shader uses a bottom-left origin, so flip Y).
+        program.uniforms.uMouse.value[0] = mouseFocus.x;
+        program.uniforms.uMouse.value[1] = 1.0 - mouseFocus.y;
+      }
       renderer.render({ scene: mesh });
     }
     animateId = requestAnimationFrame(update);

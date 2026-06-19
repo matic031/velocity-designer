@@ -59,6 +59,7 @@ const MemoBackground = memo(function MemoBackground({
       height={height}
       colors={colors}
       gradientParams={gradientParams}
+      interactive
     />
   );
 }, (prev, next) => {
