@@ -397,6 +397,22 @@ export function SocialEditor(): React.JSX.Element {
     y: false,
   });
 
+  // Inline text editing: double-click a text layer on the canvas to edit it
+  // in place. Edits flow back through UPDATE_LAYER; blur / Escape ends it.
+  const [editingTextId, setEditingTextId] = useState<string | null>(null);
+  const startTextEdit = useCallback((id: string) => {
+    dispatch({ type: "SELECT_LAYER", id });
+    setEditingTextId(id);
+  }, []);
+  const handleTextInput = useCallback((id: string, text: string) => {
+    dispatch({
+      type: "UPDATE_LAYER",
+      id,
+      update: (l) => (l.type === "text" ? { ...l, text } : l),
+    });
+  }, []);
+  const endTextEdit = useCallback(() => setEditingTextId(null), []);
+
   const handleLayerPointerDown = useCallback(
     (id: string, e: React.PointerEvent) => {
       const layer = state.layers.find((l) => l.id === id);
@@ -550,6 +566,7 @@ export function SocialEditor(): React.JSX.Element {
     // backgrounds mount nested canvas/divs, so the target is almost never
     // the outer frame, and the deselect never fired.
     dispatch({ type: "SELECT_LAYER", id: null });
+    setEditingTextId(null);
   }, []);
 
   // Keyboard nudges on the selected layer. Arrow = 1%, shift+arrow = 5%,
@@ -561,7 +578,9 @@ export function SocialEditor(): React.JSX.Element {
       const isInput =
         document.activeElement instanceof HTMLInputElement ||
         document.activeElement instanceof HTMLTextAreaElement ||
-        document.activeElement instanceof HTMLSelectElement;
+        document.activeElement instanceof HTMLSelectElement ||
+        (document.activeElement instanceof HTMLElement &&
+          document.activeElement.isContentEditable);
       if (isInput) return;
       const step = e.shiftKey ? 0.05 : 0.01;
       if (e.key === "ArrowLeft") {
@@ -593,6 +612,7 @@ export function SocialEditor(): React.JSX.Element {
   const exportBoth = useCallback(async () => {
     if (!frameRef.current) return;
     setShowSelection(false);
+    setEditingTextId(null);
     const prevSelected = state.selectedLayerId;
     const prevFormat = state.format;
     dispatch({ type: "SELECT_LAYER", id: null });
@@ -831,6 +851,10 @@ export function SocialEditor(): React.JSX.Element {
                   onLayerPointerDown={handleLayerPointerDown}
                   onLayerResizePointerDown={handleLayerResizePointerDown}
                   onBackgroundPointerDown={handleBackgroundPointerDown}
+                  editingTextId={editingTextId}
+                  onTextDoubleClick={startTextEdit}
+                  onTextInput={handleTextInput}
+                  onTextEditEnd={endTextEdit}
                 />
               </div>
             </div>
@@ -1163,7 +1187,7 @@ function GradientParamsEditor({
         min={0}
         max={1}
         step={0.01}
-        display={`${Math.round(params.spread * 100)}%`}
+        percent
         onChange={(spread) => onChange({ spread })}
       />
       <GradientSlider
@@ -1172,7 +1196,7 @@ function GradientParamsEditor({
         min={0}
         max={1}
         step={0.01}
-        display={`${Math.round(params.grain * 100)}%`}
+        percent
         onChange={(grain) => onChange({ grain })}
       />
       {params.type === "linear" ? (
@@ -1182,7 +1206,7 @@ function GradientParamsEditor({
           min={0}
           max={360}
           step={1}
-          display={`${Math.round(params.angle)}°`}
+          suffix="°"
           onChange={(angle) => onChange({ angle })}
         />
       ) : null}
@@ -1221,22 +1245,32 @@ function GradientSlider({
   min,
   max,
   step,
-  display,
   onChange,
+  percent,
+  suffix,
 }: {
   label: string;
   value: number;
   min: number;
   max: number;
   step: number;
-  display: string;
   onChange: (next: number) => void;
+  percent?: boolean;
+  suffix?: string;
 }): React.JSX.Element {
+  const f = percent ? 100 : 1;
   return (
     <div className="mt-2">
       <div className="mb-1 flex items-center justify-between text-[10px] uppercase tracking-wider text-white/45">
         <span>{label}</span>
-        <span className="font-mono text-[10px] text-white/55">{display}</span>
+        <NumberField
+          value={value * f}
+          min={min * f}
+          max={max * f}
+          step={Number((step * f).toPrecision(6))}
+          suffix={percent ? "%" : suffix}
+          onCommit={(fv) => onChange(percent ? fv / 100 : fv)}
+        />
       </div>
       <input
         type="range"
@@ -1258,13 +1292,19 @@ function BackgroundOpacityEditor({
   value: number;
   onChange: (next: number) => void;
 }): React.JSX.Element {
-  const pct = Math.round(value * 100);
   return (
     <div className="mt-3 rounded-md border border-white/10 bg-white/[0.02] p-2.5">
       <div className="mb-2 flex items-center justify-between text-[11px] uppercase tracking-wider text-white/40">
         <span>Opacity</span>
         <div className="flex items-center gap-2">
-          <span className="font-mono text-[10px] text-white/55">{pct}%</span>
+          <NumberField
+            value={value * 100}
+            min={0}
+            max={100}
+            step={1}
+            suffix="%"
+            onCommit={(fv) => onChange(fv / 100)}
+          />
           <button
             type="button"
             onClick={() => onChange(1)}
@@ -1568,10 +1608,10 @@ function Inspector({
 
       <Divider />
 
-      <SliderRow label="X" min={-0.2} max={1.2} step={0.001} value={layer.x} onChange={(v) => setPos("x", v)} display={`${(layer.x * 100).toFixed(1)}%`} />
-      <SliderRow label="Y" min={-0.2} max={1.2} step={0.001} value={layer.y} onChange={(v) => setPos("y", v)} display={`${(layer.y * 100).toFixed(1)}%`} />
-      <SliderRow label="Opacity" min={0} max={1} step={0.01} value={layer.opacity} onChange={setOpacity} display={`${Math.round(layer.opacity * 100)}%`} />
-      <SliderRow label="Rotation" min={-180} max={180} step={1} value={layer.rotation} onChange={setRotation} display={`${layer.rotation}°`} />
+      <SliderRow label="X" min={-0.2} max={1.2} step={0.001} value={layer.x} onChange={(v) => setPos("x", v)} percent />
+      <SliderRow label="Y" min={-0.2} max={1.2} step={0.001} value={layer.y} onChange={(v) => setPos("y", v)} percent />
+      <SliderRow label="Opacity" min={0} max={1} step={0.01} value={layer.opacity} onChange={setOpacity} percent />
+      <SliderRow label="Rotation" min={-180} max={180} step={1} value={layer.rotation} onChange={setRotation} suffix="°" />
 
       <div className="mt-1 text-[10.5px] leading-relaxed text-white/35">
         Drag the layer on the canvas to reposition. Shift-drag snaps to centre. Arrow keys nudge.
@@ -1620,9 +1660,9 @@ function TextInspector({
           ))}
         </select>
       </Field>
-      <SliderRow label="Size" min={0.012} max={0.2} step={0.001} value={layer.size} onChange={(v) => set("size", v)} display={`${(layer.size * 100).toFixed(1)}%`} />
-      <SliderRow label="Tracking" min={-0.06} max={0.25} step={0.001} value={layer.tracking} onChange={(v) => set("tracking", v)} display={`${layer.tracking.toFixed(3)}em`} />
-      <SliderRow label="Line height" min={0.9} max={1.6} step={0.01} value={layer.lineHeight} onChange={(v) => set("lineHeight", v)} display={layer.lineHeight.toFixed(2)} />
+      <SliderRow label="Size" min={0.012} max={0.2} step={0.001} value={layer.size} onChange={(v) => set("size", v)} percent />
+      <SliderRow label="Tracking" min={-0.06} max={0.25} step={0.001} value={layer.tracking} onChange={(v) => set("tracking", v)} suffix="em" />
+      <SliderRow label="Line height" min={0.9} max={1.6} step={0.01} value={layer.lineHeight} onChange={(v) => set("lineHeight", v)} />
       <Field label="Color">
         <ColorInput value={layer.color} onChange={(v) => set("color", v)} />
       </Field>
@@ -1672,9 +1712,9 @@ function ImageInspector({
           />
         </Field>
       )}
-      <SliderRow label="Width" min={0.05} max={1.2} step={0.001} value={layer.width} onChange={(v) => set("width", v)} display={`${(layer.width * 100).toFixed(1)}%`} />
-      <SliderRow label="Height" min={0} max={1.2} step={0.001} value={layer.height} onChange={(v) => set("height", v)} display={layer.height === 0 ? "auto (square)" : `${(layer.height * 100).toFixed(1)}%`} />
-      <SliderRow label="Feather" min={0} max={1} step={0.01} value={layer.featherRadius} onChange={(v) => set("featherRadius", v)} display={layer.featherRadius === 0 ? "off" : layer.featherRadius.toFixed(2)} />
+      <SliderRow label="Width" min={0.05} max={1.2} step={0.001} value={layer.width} onChange={(v) => set("width", v)} percent />
+      <SliderRow label="Height" min={0} max={1.2} step={0.001} value={layer.height} onChange={(v) => set("height", v)} percent />
+      <SliderRow label="Feather" min={0} max={1} step={0.01} value={layer.featherRadius} onChange={(v) => set("featherRadius", v)} />
       <Field label="CSS filter">
         <input
           value={layer.filter}
@@ -1708,8 +1748,8 @@ function LineInspector({
           <option value="horizontal">Horizontal</option>
         </select>
       </Field>
-      <SliderRow label="Length" min={0.02} max={1} step={0.01} value={layer.length} onChange={(v) => set("length", v)} display={`${(layer.length * 100).toFixed(0)}%`} />
-      <SliderRow label="Thickness" min={1} max={12} step={1} value={layer.thickness} onChange={(v) => set("thickness", v)} display={`${layer.thickness}px`} />
+      <SliderRow label="Length" min={0.02} max={1} step={0.01} value={layer.length} onChange={(v) => set("length", v)} percent />
+      <SliderRow label="Thickness" min={1} max={12} step={1} value={layer.thickness} onChange={(v) => set("thickness", v)} suffix="px" />
       <Field label="Color">
         <ColorInput value={layer.color} onChange={(v) => set("color", v)} />
       </Field>
@@ -1736,6 +1776,75 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
+/** Decimal places to show for a given step (e.g. 0.001 -> 3, 1 -> 0). */
+function decimalsForStep(step: number): number {
+  if (step >= 1) return 0;
+  const s = String(step);
+  const dot = s.indexOf(".");
+  return dot < 0 ? 0 : s.length - dot - 1;
+}
+
+/**
+ * Editable numeric field kept in sync with a slider. Holds its own text while
+ * focused so typing isn't clobbered by re-renders, commits the (clamped) value
+ * live so the slider tracks, and reformats on blur.
+ */
+function NumberField({
+  value,
+  min,
+  max,
+  step,
+  onCommit,
+  suffix,
+}: {
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  onCommit: (v: number) => void;
+  suffix?: string;
+}): React.JSX.Element {
+  const decimals = decimalsForStep(step);
+  const fmt = (v: number): string => String(Number(v.toFixed(decimals)));
+  const [text, setText] = useState(() => fmt(value));
+  const [focused, setFocused] = useState(false);
+  useEffect(() => {
+    if (!focused) setText(fmt(value));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value, focused, step]);
+  const clamp = (n: number): number => Math.max(min, Math.min(max, n));
+  return (
+    <div className="flex items-center gap-1">
+      <input
+        type="number"
+        value={text}
+        min={min}
+        max={max}
+        step={step}
+        onFocus={() => setFocused(true)}
+        onBlur={() => {
+          setFocused(false);
+          const n = parseFloat(text);
+          if (Number.isNaN(n)) {
+            setText(fmt(value));
+            return;
+          }
+          const c = clamp(n);
+          onCommit(c);
+          setText(fmt(c));
+        }}
+        onChange={(e) => {
+          setText(e.target.value);
+          const n = parseFloat(e.target.value);
+          if (!Number.isNaN(n)) onCommit(clamp(n));
+        }}
+        className="w-14 rounded border border-white/10 bg-black/30 px-1 py-0.5 text-right font-mono text-[10px] text-white/75 outline-none focus:border-velocity [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+      />
+      {suffix ? <span className="text-[10px] text-white/35">{suffix}</span> : null}
+    </div>
+  );
+}
+
 function SliderRow({
   label,
   min,
@@ -1743,7 +1852,8 @@ function SliderRow({
   step,
   value,
   onChange,
-  display,
+  percent,
+  suffix,
 }: {
   label: string;
   min: number;
@@ -1751,13 +1861,24 @@ function SliderRow({
   step: number;
   value: number;
   onChange: (v: number) => void;
-  display: string;
+  /** Edit + display the value as a percentage (value * 100). */
+  percent?: boolean;
+  /** Unit shown after the number field (e.g. "°", "em", "px"). */
+  suffix?: string;
 }): React.JSX.Element {
+  const f = percent ? 100 : 1;
   return (
     <div className="flex flex-col gap-1">
       <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.14em] text-white/40">
         <span>{label}</span>
-        <span className="text-white/65 normal-case">{display}</span>
+        <NumberField
+          value={value * f}
+          min={min * f}
+          max={max * f}
+          step={Number((step * f).toPrecision(6))}
+          suffix={percent ? "%" : suffix}
+          onCommit={(fv) => onChange(percent ? fv / 100 : fv)}
+        />
       </div>
       <input
         type="range"

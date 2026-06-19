@@ -7,7 +7,7 @@
  * editor so this component can also drive the export snapshot cleanly.
  */
 
-import { memo, useMemo } from "react";
+import { memo, useEffect, useMemo, useRef } from "react";
 import { BACKGROUND_BY_ID, resolveBackgroundColors, type Background } from "./backgrounds";
 import type { CanvasState, GradientParams, ImageLayer, Layer, LineLayer, TextLayer } from "./types";
 
@@ -27,6 +27,11 @@ interface Props {
    *  layer's centre) instead of a translate. */
   onLayerResizePointerDown?: (id: string, e: React.PointerEvent) => void;
   onBackgroundPointerDown?: (e: React.PointerEvent) => void;
+  /** id of the text layer being edited inline (double-click to enter). */
+  editingTextId?: string | null;
+  onTextDoubleClick?: (id: string) => void;
+  onTextInput?: (id: string, text: string) => void;
+  onTextEditEnd?: () => void;
 }
 
 /**
@@ -92,6 +97,10 @@ export function SocialCanvas({
   onLayerPointerDown,
   onLayerResizePointerDown,
   onBackgroundPointerDown,
+  editingTextId,
+  onTextDoubleClick,
+  onTextInput,
+  onTextEditEnd,
 }: Props): React.JSX.Element {
   const bg = BACKGROUND_BY_ID[state.backgroundId] ?? BACKGROUND_BY_ID.black;
   // Resolved colours memoised against the backgroundId + override so the
@@ -129,8 +138,12 @@ export function SocialCanvas({
           height={height}
           selected={state.selectedLayerId === layer.id}
           showSelection={showSelection}
+          editing={editingTextId === layer.id}
           onPointerDown={onLayerPointerDown}
           onResizePointerDown={onLayerResizePointerDown}
+          onTextDoubleClick={onTextDoubleClick}
+          onTextInput={onTextInput}
+          onTextEditEnd={onTextEditEnd}
         />
       ))}
       {showGuides ? (
@@ -189,16 +202,24 @@ function LayerView({
   height,
   selected,
   showSelection,
+  editing,
   onPointerDown,
   onResizePointerDown,
+  onTextDoubleClick,
+  onTextInput,
+  onTextEditEnd,
 }: {
   layer: Layer;
   width: number;
   height: number;
   selected: boolean;
   showSelection: boolean;
+  editing?: boolean;
   onPointerDown?: (id: string, e: React.PointerEvent) => void;
   onResizePointerDown?: (id: string, e: React.PointerEvent) => void;
+  onTextDoubleClick?: (id: string) => void;
+  onTextInput?: (id: string, text: string) => void;
+  onTextEditEnd?: () => void;
 }): React.JSX.Element {
   const isSelected = showSelection && selected;
   const ringStyle: React.CSSProperties = isSelected
@@ -229,7 +250,7 @@ function LayerView({
   };
 
   const handles =
-    isSelected && onResizePointerDown ? (
+    isSelected && onResizePointerDown && !editing ? (
       <>
         <ResizeHandle corner="tl" onPointerDown={resize} />
         <ResizeHandle corner="tr" onPointerDown={resize} />
@@ -240,7 +261,16 @@ function LayerView({
 
   if (layer.type === "text")
     return (
-      <TextLayerView layer={layer} height={height} baseStyle={baseStyle} onPointerDown={handle}>
+      <TextLayerView
+        layer={layer}
+        height={height}
+        baseStyle={baseStyle}
+        editing={!!editing}
+        onPointerDown={handle}
+        onTextDoubleClick={onTextDoubleClick}
+        onTextInput={onTextInput}
+        onTextEditEnd={onTextEditEnd}
+      >
         {handles}
       </TextLayerView>
     );
@@ -317,13 +347,21 @@ function TextLayerView({
   layer,
   height,
   baseStyle,
+  editing,
   onPointerDown,
+  onTextDoubleClick,
+  onTextInput,
+  onTextEditEnd,
   children,
 }: {
   layer: TextLayer;
   height: number;
   baseStyle: React.CSSProperties;
+  editing: boolean;
   onPointerDown: (e: React.PointerEvent) => void;
+  onTextDoubleClick?: (id: string) => void;
+  onTextInput?: (id: string, text: string) => void;
+  onTextEditEnd?: () => void;
   children?: React.ReactNode;
 }): React.JSX.Element {
   const fontFamily = layer.font === "brand" ? "var(--font-brand)" : "var(--font-geist-sans)";
@@ -334,25 +372,85 @@ function TextLayerView({
   if (layer.glow) {
     shadows.push(`0 0 24px ${layer.glow}`, `0 0 60px ${layer.glow}`);
   }
-  return (
-    <div style={baseStyle} onPointerDown={onPointerDown}>
-      <span
-        style={{
-          fontFamily,
-          fontSize: layer.size * height,
-          fontWeight: layer.weight,
-          letterSpacing: `${layer.tracking}em`,
-          lineHeight: layer.lineHeight,
-          color: layer.color,
-          textTransform: layer.uppercase ? "uppercase" : "none",
-          textAlign: layer.align,
-          display: "block",
-          whiteSpace: "pre",
-          textShadow: shadows.length ? shadows.join(", ") : "none",
-        }}
+  const textStyle: React.CSSProperties = {
+    fontFamily,
+    fontSize: layer.size * height,
+    fontWeight: layer.weight,
+    letterSpacing: `${layer.tracking}em`,
+    lineHeight: layer.lineHeight,
+    color: layer.color,
+    textTransform: layer.uppercase ? "uppercase" : "none",
+    textAlign: layer.align,
+    display: "block",
+    whiteSpace: "pre",
+    textShadow: shadows.length ? shadows.join(", ") : "none",
+  };
+
+  const editRef = useRef<HTMLSpanElement>(null);
+  // On entering edit mode, seed the contentEditable once and select all. It
+  // stays uncontrolled afterwards (no React children) so typing never resets
+  // the caret; edits flow out via onInput.
+  useEffect(() => {
+    if (!editing) return;
+    const el = editRef.current;
+    if (!el) return;
+    el.textContent = layer.text;
+    el.focus();
+    const sel = window.getSelection();
+    if (sel) {
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      sel.removeAllRanges();
+      sel.addRange(range);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editing]);
+
+  if (editing) {
+    return (
+      <div
+        style={{ ...baseStyle, cursor: "text" }}
+        onPointerDown={(e) => e.stopPropagation()}
       >
-        {layer.text}
-      </span>
+        <span
+          ref={editRef}
+          contentEditable
+          suppressContentEditableWarning
+          spellCheck={false}
+          onInput={(e) => onTextInput?.(layer.id, e.currentTarget.innerText)}
+          onBlur={() => onTextEditEnd?.()}
+          onKeyDown={(e) => {
+            // Keep keystrokes inside the field: stop the editor's global
+            // nudge/delete shortcuts from firing while typing.
+            e.stopPropagation();
+            if (e.key === "Escape") {
+              e.preventDefault();
+              e.currentTarget.blur();
+            }
+          }}
+          style={{
+            ...textStyle,
+            outline: "1.5px solid rgba(47,123,255,0.9)",
+            outlineOffset: 4,
+            cursor: "text",
+            caretColor: layer.color,
+          }}
+        />
+        {children}
+      </div>
+    );
+  }
+
+  return (
+    <div
+      style={baseStyle}
+      onPointerDown={onPointerDown}
+      onDoubleClick={(e) => {
+        e.stopPropagation();
+        onTextDoubleClick?.(layer.id);
+      }}
+    >
+      <span style={textStyle}>{layer.text}</span>
       {children}
     </div>
   );
