@@ -834,25 +834,24 @@ export function SocialEditor(): React.JSX.Element {
                   dispatch({ type: "SET_BACKGROUND_OPACITY", opacity })
                 }
               />
-              {bgIsMouse ? (
-                <MouseFocusEditor
-                  focus={focus}
-                  locked={focusLocked}
-                  onToggleLock={() => setFocusLocked((v) => !v)}
-                  onChangeX={(v) => {
-                    setFocusLocked(true);
-                    applyFocus(v, focus.y);
-                  }}
-                  onChangeY={(v) => {
-                    setFocusLocked(true);
-                    applyFocus(focus.x, v);
-                  }}
-                  onCenter={() => {
-                    setFocusLocked(true);
-                    applyFocus(0.5, 0.5);
-                  }}
-                />
-              ) : null}
+              <MouseFocusEditor
+                enabled={bgIsMouse}
+                focus={focus}
+                locked={focusLocked}
+                onToggleLock={() => setFocusLocked((v) => !v)}
+                onChangeX={(v) => {
+                  setFocusLocked(true);
+                  applyFocus(v, focus.y);
+                }}
+                onChangeY={(v) => {
+                  setFocusLocked(true);
+                  applyFocus(focus.x, v);
+                }}
+                onCenter={() => {
+                  setFocusLocked(true);
+                  applyFocus(0.5, 0.5);
+                }}
+              />
               {state.backgroundId === "custom-gradient" ? (
                 <GradientParamsEditor
                   params={state.gradientParams}
@@ -1373,6 +1372,7 @@ function BackgroundOpacityEditor({
 }
 
 function MouseFocusEditor({
+  enabled,
   focus,
   locked,
   onToggleLock,
@@ -1380,6 +1380,7 @@ function MouseFocusEditor({
   onChangeY,
   onCenter,
 }: {
+  enabled: boolean;
   focus: { x: number; y: number };
   locked: boolean;
   onToggleLock: () => void;
@@ -1387,6 +1388,23 @@ function MouseFocusEditor({
   onChangeY: (v: number) => void;
   onCenter: () => void;
 }): React.JSX.Element {
+  // Shown on every background so the feature is discoverable. When the active
+  // background has no cursor-position effect, the controls are replaced by a
+  // short note listing the backgrounds that do.
+  if (!enabled) {
+    return (
+      <div className="mt-3 rounded-md border border-white/10 bg-white/[0.02] p-2.5 opacity-70">
+        <div className="mb-1.5 text-[11px] uppercase tracking-wider text-white/40">
+          Mouse focus
+        </div>
+        <div className="text-[10.5px] leading-relaxed text-white/40">
+          This background has no mouse effect. Pick a mouse-reactive one to aim
+          and lock the effect for export: Gradient Blinds, Light Rays, Soft
+          Aurora, Threads, Line Waves, Iridescence, Particles, or Lightfall.
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="mt-3 rounded-md border border-white/10 bg-white/[0.02] p-2.5">
       <div className="mb-2 flex items-center justify-between text-[11px] uppercase tracking-wider text-white/40">
