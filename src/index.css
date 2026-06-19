@@ -1,0 +1,95 @@
+/* Load Geist Sans + Unbounded from Google Fonts so the designer matches
+ * the live Velocity app exactly. CSS @import must precede the Tailwind
+ * directives; @import always resolves before the cascade. */
+@import url("https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Unbounded:wght@300;400;500;600;700&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-geist-sans: "Geist", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-brand: "Unbounded", "Geist", sans-serif;
+  --velocity: #2f7bff;
+  --velocity-deep: #1f6bef;
+  --velocity-light: #7bb0ff;
+  --short: #ff4d6a;
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  background: #0a0b0f;
+  color: #fff;
+  font-family: var(--font-geist-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+input[type="range"] {
+  appearance: none;
+  background: transparent;
+}
+input[type="range"]::-webkit-slider-runnable-track {
+  background: rgba(255, 255, 255, 0.08);
+  height: 3px;
+  border-radius: 9999px;
+}
+input[type="range"]::-webkit-slider-thumb {
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 9999px;
+  background: var(--velocity);
+  margin-top: -4.5px;
+  box-shadow: 0 0 0 3px rgba(47, 123, 255, 0.18);
+  cursor: ew-resize;
+}
+input[type="range"]::-moz-range-track {
+  background: rgba(255, 255, 255, 0.08);
+  height: 3px;
+  border-radius: 9999px;
+}
+input[type="range"]::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border: none;
+  border-radius: 9999px;
+  background: var(--velocity);
+  box-shadow: 0 0 0 3px rgba(47, 123, 255, 0.18);
+  cursor: ew-resize;
+}
+
+input[type="color"] {
+  appearance: none;
+  border: none;
+  padding: 0;
+}
+input[type="color"]::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+input[type="color"]::-webkit-color-swatch {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
+
+/* Selection ring color for canvas layers (referenced by class `border-velocity` etc.) */
+.border-velocity {
+  border-color: var(--velocity);
+}
+.bg-velocity {
+  background-color: var(--velocity);
+}
+.text-velocity {
+  color: var(--velocity);
+}
+.ring-velocity {
+  --tw-ring-color: var(--velocity);
+}
