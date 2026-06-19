@@ -46,6 +46,7 @@ import {
 import { BACKGROUNDS, BACKGROUND_BY_ID, resolveBackgroundColors } from "./backgrounds";
 import { SocialCanvas } from "./SocialCanvas";
 import { mouseFocus } from "./mouseFocus";
+import { assetUrl, healAssetSrc } from "./assetUrl";
 import { TEMPLATES, TEMPLATE_BY_ID } from "./templates";
 import type {
   CanvasState,
@@ -371,6 +372,14 @@ export function SocialEditor(): React.JSX.Element {
               ...DEFAULT_GRADIENT_PARAMS,
               ...(parsed.gradientParams ?? {}),
             },
+            // Repair image layers saved with a root-absolute public path
+            // ("/tier/...", "/social/...") before the base-path fix, so the
+            // Apex crown and SpaceX wordmark load under the Pages sub-path.
+            layers: Array.isArray(parsed.layers)
+              ? parsed.layers.map((l) =>
+                  l.type === "image" ? { ...l, src: healAssetSrc(l.src) } : l,
+                )
+              : parsed.layers,
           };
           // Old saves may still reference the "grid" background that
           // was removed in favour of the custom gradient.
@@ -957,7 +966,7 @@ export function SocialEditor(): React.JSX.Element {
                 <AddLayerButton
                   label="Apex crown"
                   icon={<Crown size={14} />}
-                  onClick={() => dispatch({ type: "ADD_LAYER", layer: newImageLayer("/tier/apex-cutout.png") })}
+                  onClick={() => dispatch({ type: "ADD_LAYER", layer: newImageLayer(assetUrl("tier/apex-cutout.png")) })}
                 />
               </div>
               <input

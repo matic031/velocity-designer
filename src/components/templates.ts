@@ -9,6 +9,7 @@
  * points so we never lose them.
  */
 
+import { assetUrl } from "./assetUrl";
 import type { CanvasState } from "./types";
 import { DEFAULT_GRADIENT_PARAMS } from "./types";
 
@@ -47,7 +48,7 @@ export const TEMPLATES: Template[] = [
         {
           id: layerId(),
           type: "image",
-          src: "/tier/apex-cutout.png",
+          src: assetUrl("tier/apex-cutout.png"),
           x: 0.52,
           y: 0.32,
           width: 0.4,
@@ -131,7 +132,7 @@ export const TEMPLATES: Template[] = [
         {
           id: layerId(),
           type: "image",
-          src: "/social/wordmarks/spacex.svg",
+          src: assetUrl("social/wordmarks/spacex.svg"),
           x: 0.34,
           y: 0.48,
           width: 0.22,
