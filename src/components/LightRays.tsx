@@ -1,6 +1,5 @@
 import { useRef, useEffect, useState } from 'react';
 import { Renderer, Program, Triangle, Mesh } from 'ogl';
-import { mouseFocus } from './mouseFocus';
 
 export type RaysOrigin =
   | 'top-center'
@@ -318,10 +317,6 @@ void main() {
         uniforms.iTime.value = t * 0.001;
 
         if (followMouse && mouseInfluence > 0.0) {
-          // Follow the shared, lockable focus point (top-left origin, matching
-          // this component's convention) so exports capture a chosen position.
-          mouseRef.current.x = mouseFocus.x;
-          mouseRef.current.y = mouseFocus.y;
           const smoothing = 0.92;
 
           smoothMouseRef.current.x = smoothMouseRef.current.x * smoothing + mouseRef.current.x * (1 - smoothing);

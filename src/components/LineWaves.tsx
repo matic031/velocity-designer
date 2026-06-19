@@ -1,6 +1,5 @@
 import { Renderer, Program, Mesh, Triangle } from 'ogl';
 import { useEffect, useRef } from 'react';
-import { mouseFocus } from './mouseFocus';
 
 interface LineWavesProps {
   speed?: number;
@@ -236,10 +235,6 @@ export default function LineWaves({
       program.uniforms.uTime.value = time * 0.001;
 
       if (enableMouseInteraction) {
-        // Follow the shared, lockable focus point instead of the live cursor
-        // so PNG exports capture a chosen position. The shader uses a
-        // bottom-left origin, so flip Y.
-        targetMouse = [mouseFocus.x, 1.0 - mouseFocus.y];
         currentMouse[0] += 0.05 * (targetMouse[0] - currentMouse[0]);
         currentMouse[1] += 0.05 * (targetMouse[1] - currentMouse[1]);
         program.uniforms.uMouse.value[0] = currentMouse[0];

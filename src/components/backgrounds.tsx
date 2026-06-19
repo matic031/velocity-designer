@@ -50,10 +50,6 @@ interface BgProps {
    *  ignore it. SocialCanvas threads the live params through here so
    *  the user's tweaks render without an extra context layer. */
   gradientParams?: GradientParams;
-  /** True only for the live editor canvas. Mouse-driven backgrounds read
-   *  the shared, lockable focus point when this is set; the picker
-   *  thumbnails leave it false so they render a static, centered preview. */
-  interactive?: boolean;
 }
 
 export interface Background {
@@ -222,7 +218,7 @@ export const BACKGROUNDS: Background[] = [
     name: "Soft Aurora",
     hint: "diffuse bands",
     defaultColors: V2,
-    render: ({ colors, interactive }) => (
+    render: ({ colors }) => (
       <div className="absolute inset-0 bg-black">
         <SoftAurora
           color1={pick(colors, 0, V2[0]!)}
@@ -234,7 +230,7 @@ export const BACKGROUNDS: Background[] = [
           noiseAmplitude={0.7}
           bandHeight={0.55}
           bandSpread={0.45}
-          enableMouseInteraction={interactive}
+          enableMouseInteraction={false}
         />
       </div>
     ),
@@ -283,13 +279,13 @@ export const BACKGROUNDS: Background[] = [
     name: "Iridescence",
     hint: "shimmer sheen",
     defaultColors: V1,
-    render: ({ colors, interactive }) => (
+    render: ({ colors }) => (
       <div className="absolute inset-0 bg-black">
         <Iridescence
           color={hexToRgb01(pick(colors, 0, V1[0]!))}
           speed={0.8}
           amplitude={0.12}
-          mouseReact={interactive}
+          mouseReact={false}
         />
       </div>
     ),
@@ -322,13 +318,13 @@ export const BACKGROUNDS: Background[] = [
     name: "Threads",
     hint: "drifting lines",
     defaultColors: V1,
-    render: ({ colors, interactive }) => (
+    render: ({ colors }) => (
       <div className="absolute inset-0 bg-black">
         <Threads
           color={hexToRgb01(pick(colors, 0, V1[0]!))}
           amplitude={1.1}
           distance={0.25}
-          enableMouseInteraction={interactive}
+          enableMouseInteraction={false}
         />
       </div>
     ),
@@ -338,7 +334,7 @@ export const BACKGROUNDS: Background[] = [
     name: "Light Rays",
     hint: "radial rays",
     defaultColors: V1,
-    render: ({ colors, interactive }) => (
+    render: ({ colors }) => (
       <div className="absolute inset-0 bg-black">
         <LightRays
           raysColor={pick(colors, 0, V1[0]!)}
@@ -348,8 +344,7 @@ export const BACKGROUNDS: Background[] = [
           pulsating={false}
           fadeDistance={1.0}
           saturation={1.05}
-          followMouse={interactive}
-          mouseInfluence={0.5}
+          followMouse={false}
           noiseAmount={0.08}
           distortion={0.04}
         />
@@ -383,7 +378,7 @@ export const BACKGROUNDS: Background[] = [
     name: "Lightfall",
     hint: "vertical streaks",
     defaultColors: V3,
-    render: ({ colors, interactive }) => (
+    render: ({ colors }) => (
       <div className="absolute inset-0 bg-black">
         <Lightfall
           colors={colors}
@@ -396,7 +391,7 @@ export const BACKGROUNDS: Background[] = [
           density={0.85}
           twinkle={0.7}
           backgroundGlow={0.4}
-          mouseInteraction={interactive}
+          mouseInteraction={false}
         />
       </div>
     ),
@@ -449,7 +444,7 @@ export const BACKGROUNDS: Background[] = [
     name: "Gradient Blinds",
     hint: "vertical slats",
     defaultColors: V3,
-    render: ({ colors, interactive }) => (
+    render: ({ colors }) => (
       <div className="absolute inset-0 bg-black">
         <GradientBlinds
           gradientColors={colors}
@@ -463,8 +458,7 @@ export const BACKGROUNDS: Background[] = [
           spotlightOpacity={0.9}
           distortAmount={0.12}
           shineDirection="right"
-          mouseDampening={0.06}
-          interactive={interactive}
+          mouseDampening={0}
         />
       </div>
     ),
@@ -474,7 +468,7 @@ export const BACKGROUNDS: Background[] = [
     name: "Line Waves",
     hint: "warped lines",
     defaultColors: V3,
-    render: ({ colors, interactive }) => (
+    render: ({ colors }) => (
       <div className="absolute inset-0 bg-black">
         <LineWaves
           color1={pick(colors, 0, V3[0]!)}
@@ -488,7 +482,7 @@ export const BACKGROUNDS: Background[] = [
           edgeFadeWidth={0}
           colorCycleSpeed={1}
           brightness={0.2}
-          enableMouseInteraction={interactive}
+          enableMouseInteraction={false}
         />
       </div>
     ),
@@ -498,7 +492,7 @@ export const BACKGROUNDS: Background[] = [
     name: "Particles",
     hint: "starfield",
     defaultColors: V3,
-    render: ({ colors, interactive }) => (
+    render: ({ colors }) => (
       <div className="absolute inset-0 bg-black">
         <Particles
           particleColors={colors}
@@ -508,7 +502,7 @@ export const BACKGROUNDS: Background[] = [
           alphaParticles={true}
           particleBaseSize={70}
           sizeRandomness={1.0}
-          moveParticlesOnHover={interactive}
+          moveParticlesOnHover={false}
           disableRotation={true}
         />
       </div>

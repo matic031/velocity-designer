@@ -1,6 +1,5 @@
 import React, { useEffect, useRef } from 'react';
 import { Renderer, Program, Mesh, Triangle } from 'ogl';
-import { mouseFocus } from './mouseFocus';
 
 export interface GradientBlindsProps {
   className?: string;
@@ -19,10 +18,6 @@ export interface GradientBlindsProps {
   distortAmount?: number;
   shineDirection?: 'left' | 'right';
   mixBlendMode?: string;
-  /** When true, the spotlight follows the shared, lockable focus point and
-   *  attaches a pointer listener. When false (e.g. picker thumbnails) the
-   *  spotlight stays centered. */
-  interactive?: boolean;
 }
 
 const MAX_COLORS = 8;
@@ -59,8 +54,7 @@ const GradientBlinds: React.FC<GradientBlindsProps> = ({
   spotlightOpacity = 1,
   distortAmount = 0,
   shineDirection = 'left',
-  mixBlendMode = 'lighten',
-  interactive = false
+  mixBlendMode = 'lighten'
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const rafRef = useRef<number | null>(null);
@@ -311,22 +305,11 @@ void main() {
         uniforms.iMouse.value = [x, y];
       }
     };
-    if (interactive) canvas.addEventListener('pointermove', onPointerMove);
+    canvas.addEventListener('pointermove', onPointerMove);
 
     const loop = (t: number) => {
       rafRef.current = requestAnimationFrame(loop);
       uniforms.iTime.value = t * 0.001;
-      if (interactive) {
-        // Drive the spotlight from the shared, lockable focus point so PNG
-        // exports capture a chosen position. iMouse is in device-pixel buffer
-        // coords with a bottom-left origin.
-        const fx = mouseFocus.x * gl.drawingBufferWidth;
-        const fy = (1 - mouseFocus.y) * gl.drawingBufferHeight;
-        mouseTargetRef.current = [fx, fy];
-        if (mouseDampening <= 0) {
-          uniforms.iMouse.value = [fx, fy];
-        }
-      }
       if (mouseDampening > 0) {
         if (!lastTimeRef.current) lastTimeRef.current = t;
         const dt = (t - lastTimeRef.current) / 1000;
@@ -386,8 +369,7 @@ void main() {
     spotlightSoftness,
     spotlightOpacity,
     distortAmount,
-    shineDirection,
-    interactive
+    shineDirection
   ]);
 
   return (
